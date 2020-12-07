@@ -15,7 +15,12 @@ main (int argc, char **argv)
         printf ("\t\t\vPress a key: ");
 
         ch = getCh ( );
-        printf ("\n\t\tKey is: %c, key code is: %i\n", (isprint (ch) ? ch : '-'), ch);
+        if (ch > 255)
+            printf ("\n\t\tKey is: 'Special Key', code is: %i\n", ch);
+        else
+            printf ("\n\t\tKey is: %c, key code is: %i\n",
+                            (isprint (ch) ? ch : ' '), ch);
+
         printf ("\t\tpress 'q' to exit or 'p' to print keys table\n");
         ch = getChNoEcho ( );
 
@@ -41,7 +46,7 @@ main (int argc, char **argv)
 
 
     /* Test No Echo Mode */
-    printf ("\v\t================  Testing NO ECHO  ================\n");
+    printf ("\n\v\t================  Testing NO ECHO  ================\n");
     printf ("\t\tType your password 'ENTER to end': ");
     char *buffer = malloc (sizeof (char));
     int size = 0;

@@ -29,10 +29,10 @@
 #include	"getch.h"
 
 /*####  Global  #################################################################### */
-struct termios newAttrs, orgAttrs;
+static struct termios newAttrs, orgAttrs;
 
 #define KSTR 9
-#define TBLSIZE 53   /* No collosions` */
+#define TBLSIZE 25
 
 typedef struct key_ {
 	char kstr[KSTR];
@@ -47,10 +47,10 @@ static unsigned int get_hash_value (const char *keystr);
 static unsigned int search_keys_tbl (const char *keystr);
 
 /* Key table and key strings */
-key *KEYSTBL[TBLSIZE];
+static key *KEYSTBL[TBLSIZE];
 
 /* The order is important */
-char *KEYS[] = {
+static char *KEYS[] = {
 	"\eOP",     /* F1 */
 	"\eOQ",
 	"\eOR",
@@ -76,7 +76,7 @@ char *KEYS[] = {
 };
 
 /* The order is important */
-char *KNAMES[] = {
+static char *KNAMES[] = {
 	"<F1>",
 	"<F2>",
 	"<F3>",
@@ -295,11 +295,11 @@ insert_key_in_tbl (key *keyptr) {
 static unsigned int
 get_hash_value (const char *keystr) {
 	unsigned int hashVal = 0;
+	register int i;
 
 	/* Creating hash index */
-	while (*keystr != '\0') {
-		hashVal = ((hashVal << 4) + (int)(*keystr));
-		keystr++;
+	for (i = 0; keystr[i] != '\0'; ++i) {
+		hashVal += (int)keystr[i] + (int)keystr[i] - (i + 3);
 	}
 
 	/* Treming index to table size */
