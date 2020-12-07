@@ -4,8 +4,8 @@
 
 CC     = gcc
 BIN    = getch_test
-OBJ    = get_ch_driver.o
-SRC    = get_ch_driver.c
+OBJ    = test.o
+SRC    = test.c
 LIB    = getch
 SLIB   = libgetch
 CFLAGS = -c -Wall -Werror -O2
