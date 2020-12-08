@@ -27,7 +27,7 @@
 
 /* #####   MACROS  -  LOCAL TO THIS SOURCE FILE   ################################### */
 
-/* Macro to convert to binary */
+/* Macro to print in binary */
 #define BINSTR "0b%c%c%c%c%c%c%c%c"
 #define TOBIN_(num)          \
     (num & 0x80 ? '1' : '0'),\
@@ -71,19 +71,16 @@ get_part_ip (WINDOW *win, char *partIP, bool islast, WINDOW *dwin) {
      * digit or limit it to 5 or disable it
      */
 
-_loop:               /* Goto is useful sometimes!! */
+Loop:               /* Goto statement is useful sometimes!! */
     for (; i < 3; i++) {
         switch (i) {
             case 0:
                 while (!isdigit(tmp = wgetch(win))) {
                     if (tmp == KEY_RESIZE)
                         winch_hndlr(KEY_RESIZE);
-                    else if (tmp == BKS || tmp == ENTR) /* ignore backspace   */
-                        wmove(win, y, x);
-                    else if (isprint(tmp))              /* erase any alphabet */
-                        wprintw(win, "\b \b");
                 }
                 partIP[i] = tmp;    /* Now it's ok to store it in buffer */
+                waddch (win, tmp);  /* No ECHO mode so i must print manually */
 
                 /* Prepare thir digit status */
                 thirdStatus ^= thirdStatus; /* Zero it        */
@@ -101,25 +98,23 @@ _loop:               /* Goto is useful sometimes!! */
 
             case 1: /* get second digit */
                 while (!isdigit(tmp = wgetch(win))) {
-                    if (tmp == KEY_RESIZE)
-                        winch_hndlr(KEY_RESIZE);
-                    else if (tmp == BKS) {
-                        wprintw(win, " \b"); /* if user decided to erase first digit */
-                        i--;                 /* reset the loop */
-                        goto _loop;
-                    } else if (tmp == ENTR) {
-                        partIP[i] = '\0';
-                        goto _end;
-                    } else if (tmp == '.') {
-                        if (!islast)
-                            goto _end;
-                        else
-                            wprintw (win, "\b \b");
+                    switch (tmp) {
+                        case KEY_RESIZE:
+                            winch_hndlr(KEY_RESIZE);
+                            break;
+                        case BKS:
+                            wprintw(win, "\b \b");  /* if user decided to erase first digit */
+                            i--;                    /* reset the loop */
+                            goto Loop;
+                        case ENTR:
+                            partIP[i] = '\0';
+                            goto End;
+                        case '.':
+                            goto End;
                     }
-                    else if (isprint(tmp)) /* Erase alphbets */
-                        wprintw(win, "\b \b");
                 }
                 partIP[i] = tmp;
+                waddch (win, tmp);
 
                 /* setting up 3rd digit status: < 5, == 5, > 5      */
                 thirdStatus &= 0x0C;       /* clear LSB 2 bits only */
@@ -139,7 +134,7 @@ _loop:               /* Goto is useful sometimes!! */
                 tmp = get_third_digit (win, thirdStatus, islast);
                 if (tmp == -1) {  /* Delete last digit */
                     i--;
-                    goto _loop;
+                    goto Loop;
                 } else if (tmp == ENTR) {
                     partIP[i] = '\0';
                     break;
@@ -151,7 +146,7 @@ _loop:               /* Goto is useful sometimes!! */
         }
     }
 
-_end:
+End:
     mvwprintw (dwin, 1, 2, "3rd digit status: 0b00000000");
     mvwprintw (dwin, 2, 2, "3rd digit status: 0");
     update_panels ( );
@@ -181,73 +176,63 @@ _end:
  */
 int
 get_third_digit (WINDOW *win, int status, bool islast) {
-
     int third;
 
     switch (status) {
-        case 0x6 ... 0x0A:     /* Third digit is disabled */
+        case 0x6 ... 0x0A:                 /* Third digit is disabled */
             do {
-                third = wgetch(win);
-                if (third == KEY_RESIZE) /* Handle term resize */
-                    winch_hndlr(KEY_RESIZE);
-                else if (third == '.' && !islast) {
-                    wprintw (win, "\b \b");
-                    return ENTR;
-                } else if (isprint(third))
-                    wprintw(win, "\b \b"); // Erase alphabets
-            } while (third != BKS && third != ENTR);
+                third = wgetch (win);
+                switch (third) {
+                    case KEY_RESIZE:       /* Handle term resize */
+                        winch_hndlr(KEY_RESIZE);
+                        break;
+                    case BKS:
+                        wprintw(win, "\b \b");
+                        return -1;
+                    case  '.':
+                    case ENTR:
+                        return ENTR;
+                    default:
+                        break;
+                }
+            } while (TRUE);
 
-            switch (third) {
-                case BKS:
-                    wprintw(win, " \b");
-                    return -1;
-                case ENTR:
-                    return ENTR;
-            }
-
-        case 5:     /* third is restrected to <= 5 */
+        case 5:                            /* third is restrected to <= 5 */
             while (!isdigit (third = wgetch (win)) || third > '5') {
                 switch (third) {
-                    case KEY_RESIZE: /* Handle term resize */
+                    case KEY_RESIZE:       /* Handle term resize */
                         winch_hndlr(KEY_RESIZE);
                         break;
                     case BKS:
-                        wprintw(win, " \b");
+                        wprintw(win, "\b \b");
                         return -1;
-                    case '.':
-                        if (!islast)
-                            return ENTR;
-                        else
-                            wprintw (win, "\b \b");
-                        break;
+                    case  '.':
                     case ENTR:
                         return ENTR;
                     default:
-                        if (isprint(third))
-                            wprintw(win, "\b \b"); /* Erase alphabets */
                         break;
                 }
             }
             break;
 
-        default :     /* Third fully enabled */
+        default :                          /* Third fully enabled */
             while (!isdigit (third = wgetch (win))) {
                 switch (third) {
-                    case KEY_RESIZE: /* Handle term resize */
+                    case KEY_RESIZE:       /* Handle term resize */
                         winch_hndlr(KEY_RESIZE);
                     case BKS:
-                        wprintw(win, " \b");
+                        wprintw(win, "\b \b");
                         return -1;
+                    case  '.':
                     case ENTR:
                         return ENTR;
                     default:
-                        if (isprint(third))
-                            wprintw(win, "\b \b"); // Erase alphabets
                         break;
                 }
-            };
+            }
             break;
     }
+    waddch (win, third);
     return third;
 }		/* -----  end of function get_third_digit  ----- */
 
@@ -327,22 +312,20 @@ get_mask (WINDOW *win) {
     ch[2] = '\0';
 
     getyx(win, y, x);
-    mvwprintw(win, y+1, 4, "Enter Network mask (1 - 32): ");
+    x = 4;
+    mvwprintw(win, y+1, x, "Enter Network mask (1 - 32): ");
     getyx(win, y, x);
 
-_loop:
+Loop:
     for (i = 0; i < 2; ++i) {
         switch (i) {
             case 0:
                 while (!isdigit(mask = wgetch(win))) {
                     if (mask == KEY_RESIZE)
                         winch_hndlr(KEY_RESIZE);
-                    if (mask == BKS || mask == ENTR)
-                        wmove(win, y, x);
-                    else if (isprint(mask))
-                        wprintw(win, "\b \b");
                 }
                 ch[i] = mask;
+                waddch (win, mask);
                 break;
 
             case 1:
@@ -350,58 +333,54 @@ _loop:
                     if (mask == KEY_RESIZE)
                         winch_hndlr(KEY_RESIZE);
                     if (mask == BKS) {
-                        wprintw(win, " \b");
-                        goto _loop;
+                        wprintw(win, "\b \b");
+                        goto Loop;
                     } else if (mask == ENTR) {
                         ch[i] = '\0';
-                        goto _exit;
+                        goto Exit;
                         break;
                     }
-                    else if (isprint(mask))
-                        wprintw(win, "\b \b");
                 }
 
                 if (ch[0] == '3' && mask > '2') {
-                    wprintw(win, "\b \b");
                     while (!isdigit(mask = wgetch(win)) || mask > '2') {
                         if (mask == KEY_RESIZE)
                             winch_hndlr(KEY_RESIZE);
                         if (mask == BKS) {
-                            wprintw(win, " \b");
-                            goto _loop;
+                            wprintw(win, "\b \b");
+                            goto Loop;
                         }
                         else if (mask == ENTR) {
                             ch[i] = '\0';
                             break;
                         }
-                        else if (isprint(mask)) wprintw(win, "\b \b");
                     }
                     ch[i] = mask;
+                    waddch (win, mask);
                     break;
                 } else if (ch[0] > '3') {
                     ch[i] = '\0';
-                    wprintw(win, "\b \b");
                     while ((mask = wgetch(win)) != BKS && mask != ENTR) {
-                        if (isprint(mask))
-                            wprintw(win, "\b \b");
                         if (mask == KEY_RESIZE)
                             winch_hndlr(KEY_RESIZE);
                     }
 
                     if (mask == BKS) {
-                        wprintw(win, " \b");
-                        goto _loop;
+                        wprintw(win, "\b \b");
+                        goto Loop;
                     } else if (mask == ENTR) {
                         ch[i] = '\0';
                         break;
                     }
-                } else
+                } else {
                     ch[i] = mask;
+                    waddch (win, mask);
+                }
                 break;
         }
     }
 
-_exit:
+Exit:
     mask = atoi(ch);
     return mask;
 }

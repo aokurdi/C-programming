@@ -29,7 +29,7 @@
 #include "getIP.h"
 
 /* #####   MACROS  -  LOCAL TO THIS SOURCE FILE   ################################### */
-#define COLOR_GREY 8
+#define COLOR_GREY  8
 #define COLOR_LGREY 9
 #define COLOR_DGREY 10
 
@@ -400,7 +400,6 @@ print_result (WINDOW *win, char *title, int choice) {
     wattroff  (win, A_BOLD|A_ITALIC);
 
     /* Echo, show cursor, and Panel */
-    echo ( );
     curs_set (1);
     show_panel (RESULT_PAN);
     update_panels ( );
@@ -525,7 +524,6 @@ clear_result_win (WINDOW *win) {
     update_panels ( );
     doupdate ( );
 
-    noecho ( );
     while ((tmp = getch( )) != ' ') {
         if (tmp == KEY_RESIZE)
             winch_hndlr (KEY_RESIZE);

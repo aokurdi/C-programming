@@ -137,14 +137,15 @@ print_network_id(WINDOW *win, unsigned int *networkId) {
     unsigned int netId, y, x;
 
     getyx(win, y, x);
+    x = 4;
 
     /* convert from network long to host long (little Endian) */
     netId = ntohl(*networkId);
 
     /* Convert from integral fromat to A.B.C.D string */
     inet_ntop(AF_INET, &netId, netIdStr, IPLEN);
-    mvwhline(win, y + 1, 4, 0, 44);
-    mvwprintw(win, y + 2, 4, "Network: %s/%d", netIdStr, MASK);
+    mvwhline(win, y + 1, x, 0, 44);
+    mvwprintw(win, y + 2, x, "Network: %s/%d", netIdStr, MASK);
     return;
 }
 
@@ -201,12 +202,13 @@ _print_broadcast_addr(WINDOW *win, unsigned int *brdcastAddr, char const *caller
     inet_ntop(AF_INET, &bAddr, brdcastStr, IPLEN);
 
     getyx(win, y, x);
+    x = 4;
     if (0 == strcmp(callerFunc, "print_result"))
     {
-        mvwhline(win, y + 1, 4, 0, 44);
+        mvwhline(win, y + 1, x, 0, 44);
         y++;
     }
-    mvwprintw(win, y + 1, 4, "Broadcast address: %s", brdcastStr);
+    mvwprintw(win, y + 1, x, "Broadcast address: %s", brdcastStr);
     return;
 }
 
@@ -224,10 +226,11 @@ void print_integer_format(WINDOW *win, unsigned int *ipAddr) {
 
     int x, y;
     getyx(win, y, x);
+    x = 4;
     /* convert ip to Big endian */
     *ipAddr = htonl(*ipAddr);
-    mvwhline(win, y + 1, 4, 0, 44);
-    mvwprintw(win, y + 2, 4, "IP equevelant Int value is: %u", *ipAddr);
+    mvwhline(win, y + 1, x, 0, 44);
+    mvwprintw(win, y + 2, x, "IP equevelant Int value is: %u", *ipAddr);
 }
 
 /*
@@ -245,21 +248,27 @@ print_ABCD_format(WINDOW *win) {
     unsigned int ipAddr;
 
     getyx(win, y, x);
-    mvwprintw(win, y + 1, 4, "Enter ip address (INT FROMAT): ");
+    x = 4;
+    mvwprintw(win, y + 1, x, "Enter ip address (INT FROMAT): ");
 
     for (i = 0; i < 10; i++) {
         while (!isdigit(ch = wgetch(win))) {
-            if (isprint(ch))
-                wprintw(win, "\b \b");
-            else if (ch == ENTR) {
+            if (ch == ENTR && i) {
                 ch = '\0';
                 break;
+            } else if (ch == 0x07) {
+                if (i) {
+                    wprintw (win, "\b \b");
+                    --i;
+                }
             }
         }
 
         buffer[i] = ch;
         if (ch == '\0')
             break;
+        else
+            waddch (win, ch);
     }
 
     ipAddr = atoi(buffer);
@@ -267,8 +276,8 @@ print_ABCD_format(WINDOW *win) {
 
     /* using inet_pton from arpa/net to convert ip to integer */
     inet_ntop(AF_INET, &ipAddr, buffer, IPLEN);
-    mvwhline(win, y + 2, 4, 0, 44);
-    mvwprintw(win, y + 3, 4, "The IP in A.B.C.D fromat is: %s", buffer);
+    mvwhline(win, y + 2, x, 0, 44);
+    mvwprintw(win, y + 3, x, "The IP in A.B.C.D fromat is: %s", buffer);
 }
 
 /*
@@ -336,8 +345,9 @@ get_topology(WINDOW *win, unsigned int *ipAddr, unsigned int *mask) {
     getyx(win, y, x);
     print_network_id(win, &networkId);
     getyx(win, y, x);
-    mvwprintw(win, y + 1, 4, "Max Hosts/Net: %u", get_subnet_cardinality(mask));
-    mvwprintw(win, y + 2, 4, "The first host ip is: %s", firstIpStr);
-    mvwprintw(win, y + 3, 4, "The last  host ip is: %s", lastIpStr);
+    x = 4;
+    mvwprintw(win, y + 1, x, "Max Hosts/Net: %u", get_subnet_cardinality(mask));
+    mvwprintw(win, y + 2, x, "The first host ip is: %s", firstIpStr);
+    mvwprintw(win, y + 3, x, "The last  host ip is: %s", lastIpStr);
     print_broadcast(win, &brdcastAddr);
 }
