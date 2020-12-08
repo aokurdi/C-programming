@@ -32,7 +32,7 @@
 static struct termios newAttrs, orgAttrs;
 
 #define KSTR 9
-#define TBLSIZE 25
+#define TBLSIZE 37
 
 typedef struct key_ {
 	char kstr[KSTR];
@@ -153,8 +153,7 @@ getCh ( ) {
 
 	/*
 	 * Used a buffer to be able to catch those F(x) keys
-	 * they all start with ESC char
-	 */
+	 * they all start with ESC char */
 	if (read (STDIN_FILENO, ch, 5)) {
 		if (ch[0] == ESC) {       /* Handle ESC, F(x), and arrow keys */
 			create_keys_tbl ( );
@@ -294,12 +293,12 @@ insert_key_in_tbl (key *keyptr) {
  */
 static unsigned int
 get_hash_value (const char *keystr) {
-	unsigned int hashVal = 0;
-	register int i;
+	long int hashVal = 0;
 
 	/* Creating hash index */
-	for (i = 0; keystr[i] != '\0'; ++i) {
-		hashVal += (int)keystr[i] + (int)keystr[i] - (i + 3);
+	while (*keystr != '\0' && *keystr != 0x7E) {
+		hashVal = ((hashVal << 8) | *keystr) + 33;
+		keystr++;
 	}
 
 	/* Treming index to table size */
