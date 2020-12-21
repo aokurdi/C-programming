@@ -35,11 +35,17 @@ getCh () for linux
       %: make install
       
       then when compiling a project using this lib you should link it with: -lgetch
-      
+            
       in case you want to test before install
       %: make
       
       it will produce a file named getch_test, run it and take a look at the source.
       
-  I hope this will help someone who is trying to learn c programming.
+ #LIMITATIONS:
+ 
+      This lib is assuming you are usig a terminal emulator in VT100 mode, like most terminals you'll find on a typical linux destro;
+      but if the terminal is using another mode such as VT220 then it will send diffirent escape sequence, to make this lib portable 
+      and compatible with all terminals you will need to use the terminfo database which is out of the scope of this example because 
+      it will involve using term.h and cureses.h header files and you will request the key code from the data base.
+      I hope this will help someone who is trying to learn c programming.
 
