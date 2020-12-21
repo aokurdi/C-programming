@@ -76,7 +76,7 @@ main (int argc, char *argv[]) {
     int choice = 0;
 
     /*  In case Ctrl-c is chought clean up before term */
-    signal (SIGINT, free_and_exit);
+    signal (SIGINT,  free_and_exit);
     signal (SIGTERM, free_and_exit);
 
     /* Initialie Curses */
@@ -186,10 +186,12 @@ free_and_exit (int sig) {
     del_panel (RESULT_PAN);
     del_panel (DEBUG_PAN);
     del_panel (MENU_PAN);
-    delwin (RESULT_WIN);
-    delwin (DEBUG_WIN);
-    delwin (MENU_WIN);
-    endwin ( );
+    delwin    (RESULT_WIN);
+    delwin    (DEBUG_WIN);
+    delwin    (MENU_WIN);
+    endwin    ( );
+    delwin    (stdscr);
+    putchar   ('\n');
 
     /* Handling Intrupt and kill */
     if (sig == SIGINT || sig == SIGTERM) {
@@ -246,8 +248,8 @@ winch_hndlr (int sig) {
         show_panel (RESULT_PAN);
         draw_win_shadow (RESULT_WIN);
     } if (!isDebugHidden)
-    top_panel (DEBUG_PAN);
 
+    top_panel (DEBUG_PAN);
     update_panels ( );
     doupdate ( );
 } /* -----  end of function sig_handler  ----- */

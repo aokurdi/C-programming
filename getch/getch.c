@@ -19,35 +19,36 @@
  * =====================================================================================
  */
 
-
+#include    <ctype.h>
 #include	<termios.h>
 #include	<stdbool.h>
-#include	<stdio.h>
+#include	<signal.h>
 #include	<string.h>
 #include	<stdlib.h>
 #include	<unistd.h>
+#include	<stdio.h>
+
+
 #include	"getch.h"
 
-/*####  Global  #################################################################### */
-static struct termios newAttrs, orgAttrs;
+/*####  Defines #################################################################### */
 
-#define KSTR 9
+#define KSTR	15
 #define TBLSIZE 37
 
-typedef struct key_ {
+
+/*####  Global  #################################################################### */
+
+typedef struct key key;
+static struct termios orgTerm;
+static key *KEYSTBL[TBLSIZE];
+
+struct key {
 	char kstr[KSTR];
 	char kname[KSTR];
 	int  kcode;
-	struct key_  *next;
-} key;
-
-/* Methods to create keys table */
-bool insert_key_in_tbl (key *keyptr);
-static unsigned int get_hash_value (const char *keystr);
-static unsigned int search_keys_tbl (const char *keystr);
-
-/* Key table and key strings */
-static key *KEYSTBL[TBLSIZE];
+	struct key *next;
+};
 
 /* The order is important */
 static char *KEYS[] = {
@@ -101,14 +102,42 @@ static char *KNAMES[] = {
 	"<HOME>",   /* HOME  */
 };
 
+
+/*####  Private routines  ########################################################## */
+
+static unsigned int search_keys_tbl ( const char * );
+static unsigned int get_hash_value ( const char * );
+int  get_key_code ( const char * );
+bool insert_key_in_tbl ( key * );
+void handle_SIGTERM ( int );
+int  init_term ( void );
+int  read_key ( );
+
+
 /*
  *  === Restore Attributes before exit =================================================
  * Restore original attributes at exit
  */
-void
-restore_org_attrs ( void ) {
-	tcsetattr ( STDIN_FILENO, TCSANOW, &orgAttrs );
+	void
+restore_org_attrs ( void )
+{
+	tcsetattr( STDIN_FILENO, TCSAFLUSH, &orgTerm );
 }
+
+/*
+ * ===  FUNCTION  ======================================================================
+ *         Name:  handle_SIGKILL
+ *  Description: restores term and exit in case of kill is recieved
+ * =====================================================================================
+ */
+	void
+handle_SIGTERM ( int sig )
+{
+	restore_org_attrs();
+	fprintf( stderr, "\e[2J\e[1H\n\n" );  /* Clear Screen */
+	fprintf( stderr, "\tFatal: Recived SIGTERM... %d\n", sig );
+	exit( 128 + sig );
+}		/* -----  end of function handle_SIGKILL  ----- */
 
 /*
  * ===  FUNCTION  ======================================================================
@@ -122,119 +151,170 @@ restore_org_attrs ( void ) {
  *		  int ch = getCh ();
  * =====================================================================================
  */
-int
-getCh ( ) {
-	char ch[6];
-	int code = 0;
-
-	for (int i = 0; i < 6; ++i)
-		ch[i] = '\0';
-
+	int
+getCh ( )
+{
 	/* Make sure stdin is a terminal. */
-	if (!isatty (STDIN_FILENO)) {
-		fprintf (stderr, "Not a terminal.\n");
-		exit (EXIT_FAILURE);
+	if( !isatty (STDIN_FILENO) ) {
+		fprintf( stderr, "Not a terminal.\n" );
+		return -1;
 	}
-
-	/* For some reason read blocks any previous printf */
-	/* Flushing the stdout force to show it */
-	fflush (stdout);
 
 	/* Save the original terminal attrs */
-	tcgetattr (STDIN_FILENO, &orgAttrs);
-	atexit (restore_org_attrs);           /* Restore tty atexit */
-
-	/* Convert non-canon mode */
-	tcgetattr (STDIN_FILENO, &newAttrs);
-	newAttrs.c_lflag &= ~(ICANON|ECHO);   /* Clear ICANON and ECHO. */
-	newAttrs.c_cc[VMIN] = 1;              /* i will not show F(x) and ESC */
-	newAttrs.c_cc[VTIME] = 1;
-	tcsetattr (STDIN_FILENO, TCSAFLUSH, &newAttrs);
-
-	/*
-	 * Used a buffer to be able to catch those F(x) keys
-	 * they all start with ESC char */
-	if (read (STDIN_FILENO, ch, 5)) {
-		if (ch[0] == ESC) {       /* Handle ESC, F(x), and arrow keys */
-			create_keys_tbl ( );
-			code = search_keys_tbl (ch);
-		} else {
-			code = ch[0];
-			putchar (ch[0]);       /* Print all other chars */
-			fflush (stdout);
-		}
-		free_keys_tbl ( );
+	if( tcgetattr(STDIN_FILENO, &orgTerm) == -1 ) {
+		perror( "tcgetattr" );
+		return -1;
 	}
-	return code;
+
+	/* In case we recieve kill signal we want to restore term */
+	signal( SIGTERM, handle_SIGTERM );
+
+	fflush( stdout );
+	init_term( );
+	int keyCode = read_key( );
+
+	if( isprint(keyCode) )
+		if( write( STDOUT_FILENO, &keyCode,  1 ) < 1 )
+			perror( "write" );
+
+	restore_org_attrs( );
+
+	return keyCode;
 }
+
+/*
+ * ===  FUNCTION  ======================================================================
+ *         Name:  init_term
+ *  Description: put Terminal in Raw mode
+ * =====================================================================================
+ */
+	int
+init_term ( void )
+{
+	struct termios rawTerm;
+	tcgetattr( STDIN_FILENO, &rawTerm );
+
+	/* IXON: disable Ctl-s Ctal-q
+	 * ICRNL: disable \r\n combo so Ctl-m returns 13 */
+	rawTerm.c_iflag &= ~( IXON | ICRNL );  /* Input flags */
+
+	/* ISIG: disable Ctl-c Ctl-z, ICANON: disable stdin buffering
+	 * IEXTEN: disable Ctl-v, ECHO: disable echo */
+	rawTerm.c_lflag &= ~( ICANON | ECHO | IEXTEN | ISIG );  /* Local falgs */
+
+	/* OPOST: disable output Processing */
+	rawTerm.c_oflag &= ~( OPOST );  /* Output flags */
+
+	/* Force char size to be 8 bits */
+	rawTerm.c_cflag |= ( CS8 );
+
+	rawTerm.c_cc[VMIN]  = 1; /* Read at least 1 char */
+	rawTerm.c_cc[VTIME] = 0; /* Don't wait */
+
+	tcsetattr( STDIN_FILENO, TCSAFLUSH, &rawTerm );
+    return 0;
+}		/* -----  end of function init_term  ----- */
+
+/*
+ * ===  FUNCTION  ======================================================================
+ *         Name:  read_key
+ *  Description: get a key from user
+ * =====================================================================================
+ */
+	int
+read_key ( )
+{
+	int code, flag;
+	char keyStr[KSTR];
+	memset( keyStr, '\0', KSTR );
+
+	flag = read( STDIN_FILENO, keyStr, KSTR );
+
+	if( flag > 1 )       /* Handle F(x), and arrow keys */
+		code = get_key_code( keyStr );
+	else
+		code = *keyStr;
+
+	return code;
+}		/* -----  end of function read_key  ----- */
+
+/*
+ * ===  FUNCTION  ======================================================================
+ *         Name:  get_key_code
+ *  Description: process the key and return a code
+ * =====================================================================================
+ */
+	int
+get_key_code ( const char *kstr )
+{
+	int code;
+
+	create_keys_tbl( );
+	code = search_keys_tbl( kstr );
+	free_keys_tbl( );
+	return code;
+}		/* -----  end of function get_key_code  ----- */
 
 /*
  * ===  FUNCTION  ======================================================================
  *         Name:  getChNoEcho
  *  Description: get a char from user NO echo NOR wait for Enter key to be pressed
  *  			 NON-CANONICAL MODE
- *  Returns: ascii decimal value of char or -1 for special function keys
+ *  Returns: ascii decimal value of char or key code for special function keys
  * =====================================================================================
  */
-int
-getChNoEcho ( ) {
-	char ch[10];
-
+	int
+getChNoEcho ( )
+{
 	/* Make sure stdin is a terminal. */
-	if (!isatty (STDIN_FILENO)) {
-		fprintf (stderr, "Not a terminal.\n");
-		exit (EXIT_FAILURE);
+	if( !isatty (STDIN_FILENO) ) {
+		fprintf( stderr, "Not a terminal.\n" );
+		return -1;
 	}
-
-	/* For some reason read blocks any previous printf */
-	/* Flushing the stdout force to show it */
-	fflush (stdout);
 
 	/* Save the original terminal attrs */
-	tcgetattr (STDIN_FILENO, &orgAttrs);
-	atexit (restore_org_attrs);  /* Restore tty atexit */
-
-	/* Convert non-canon mode */
-	tcgetattr ( STDIN_FILENO, &newAttrs );
-	newAttrs.c_lflag &= ~(ICANON|ECHO ); /* Clear ICANON and ECHO. */
-	newAttrs.c_cc[VMIN] = 1;
-	newAttrs.c_cc[VTIME] = 1;
-	tcsetattr (STDIN_FILENO, TCSAFLUSH, &newAttrs);
-
-	/* Used a buffer to be able to catch those F(x) keys
-	 * they all start with ESC char */
-	if (read (STDIN_FILENO, ch, 9)) {
-	if (ch[0] == ESC)        /* Ignore ESC and F1 - F12 */
-		ch[0] = -1;
+	if( tcgetattr(STDIN_FILENO, &orgTerm) == -1 ) {
+		perror( "tcgetattr" );
+		return -1;
 	}
-	return ch[0];
+
+	/* In case we recieve kill signal we want to restore term */
+	signal( SIGTERM, handle_SIGTERM );
+
+	fflush( stdout );
+	init_term( );
+	int keyCode = read_key( );
+
+	restore_org_attrs( );
+
+	return keyCode;
 }
 
 /* ###  The following functions are used internally to build a table to handle
  * FUNCTION keys
  */
-
 /*
  * ===  Creates keys table  ============================================================
  *         Name:  create_keys_tbl
  *  Description:
  * =====================================================================================
  */
-void
-create_keys_tbl ( ) {
+	void
+create_keys_tbl ( )
+{
 	key *tmp = NULL;
 	register int i;
 
 	/* Initialize the keys table */
-	for (i = 0; i < TBLSIZE; i++) KEYSTBL[i] = NULL;
+	for( i = 0; i < TBLSIZE; i++ ) KEYSTBL[i] = NULL;
 
 	/* Allocate mem for a key and generate code */
-	for (i = 0; i < (sizeof (KEYS)/sizeof (KEYS[0])); i++) {
-		tmp = malloc (sizeof (key));
-		strcpy (tmp->kstr, KEYS[i]);    /* Key string */
-		strcpy (tmp->kname, KNAMES[i]); /* Key string */
+	for( i = 0; i < (sizeof (KEYS)/sizeof (KEYS[0])); i++ ) {
+		tmp = malloc( sizeof (key) );
+		strcpy( tmp->kstr, KEYS[i] );    /* Key string */
+		strcpy( tmp->kname, KNAMES[i] ); /* Key string */
 		tmp->kcode = i + 265;           /* Generate code for key */
-		insert_key_in_tbl (tmp);        /* Insert key in keys table */
+		insert_key_in_tbl( tmp );        /* Insert key in keys table */
 	}
 }		/* -----  end of function create_keys_tbl  ----- */
 
@@ -245,22 +325,22 @@ create_keys_tbl ( ) {
  *  Description: I am using this function to tweek the hash table for the keys
  * =====================================================================================
  */
-void
-print_keys_tbl ( ) {
+	void
+print_keys_tbl ( )
+{
 	register int i;
-	for (i = 0; i < TBLSIZE; ++i) {
+	for( i = 0; i < TBLSIZE; ++i ) {
 
-		if (KEYSTBL[i] != NULL) {
-			printf ("\t%d", i);
+		if( KEYSTBL[i] != NULL ) {
+			printf( "\t%d", i );
 			key *tmp = KEYSTBL[i];
 
-			while (tmp != NULL) {
-				printf ("\t{key: %s\tkey string: ^[", tmp->kname);
-				fwrite (&tmp->kstr[1], 1, 6, stdout); /* To skip printing esc char */
-				printf ("\tcode: %d}", tmp->kcode);
+			while( tmp != NULL ) {
+				printf( "\t{key: %s\tkey string: ^[%s", tmp->kname, &tmp->kstr[1] );
+				printf( "\tcode: %d}", tmp->kcode );
 				tmp = tmp->next;
 			}
-			printf ("\n");
+			printf( "\n" );
 		}
 	}
 }		/* -----  end of function print_keys_tbl  ----- */
@@ -272,13 +352,14 @@ print_keys_tbl ( ) {
  *  Description:
  * =====================================================================================
  */
-bool
-insert_key_in_tbl (key *keyptr) {
+	bool
+insert_key_in_tbl (key *keyptr)
+{
 	int index;
-	if (keyptr == NULL)
+	if( keyptr == NULL )
 		return false;
 
-	index = get_hash_value (keyptr->kstr);
+	index = get_hash_value( keyptr->kstr );
 	keyptr->next = KEYSTBL[index];
 	KEYSTBL[index] = keyptr;
 	return true;
@@ -291,12 +372,13 @@ insert_key_in_tbl (key *keyptr) {
  *  Description:
  * =====================================================================================
  */
-static unsigned int
-get_hash_value (const char *keystr) {
+	static unsigned int
+get_hash_value ( const char *keystr )
+{
 	long int hashVal = 0;
 
 	/* Creating hash index */
-	while (*keystr != '\0' && *keystr != 0x7E) {
+	while( *keystr != '\0' && *keystr != 0x7E ) {
 		hashVal = ((hashVal << 8) | *keystr) + 33;
 		keystr++;
 	}
@@ -312,16 +394,17 @@ get_hash_value (const char *keystr) {
  *  Description:
  * =====================================================================================
  */
-static unsigned int
-search_keys_tbl (const char *keystr) {
+	static unsigned int
+search_keys_tbl( const char *keystr )
+{
 	key *tmp;
-	int index = get_hash_value (keystr);
+	int index = get_hash_value( keystr );
 	tmp = KEYSTBL[index];
 
-	while (tmp != NULL && strcmp (tmp->kstr, keystr) !=0)
+	while( tmp != NULL && strcmp (tmp->kstr, keystr) !=0 )
 		tmp = tmp->next;
 
-	return (tmp ? tmp->kcode : 27);
+	return( tmp ? tmp->kcode : 27 );
 }		/* -----  end of function search_keys_tbl  ----- */
 
 
@@ -331,14 +414,15 @@ search_keys_tbl (const char *keystr) {
  *  Description:
  * =====================================================================================
  */
-void
-free_keys_tbl ( ) {
+	void
+free_keys_tbl ( )
+{
 	key *tmp;
-	for ( int i = 0; i < TBLSIZE; ++i ) {
-		while (KEYSTBL[i] != NULL) {
+	for( int i = 0; i < TBLSIZE; ++i ) {
+		while( KEYSTBL[i] != NULL ) {
 			tmp = KEYSTBL[i];
 			KEYSTBL[i] = KEYSTBL[i]->next;
-			free (tmp);
+			free( tmp );
 		}
 	}
 	return ;
