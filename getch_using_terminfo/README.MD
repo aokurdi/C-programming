@@ -34,7 +34,7 @@ getCh () for linux
 
       %: make install
 
-      then when compiling a project using this lib you should link it with: -lgetch
+      then when compiling a project using this lib you should link it with: -lti
 
       in case you want to test before install
       %: make
