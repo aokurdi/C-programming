@@ -7,7 +7,7 @@ HEADER = ti.h
 SLIB   = libti.so
 CFLAGS = -c -Wall -Werror -O2
 LFLAGS = -fPIC
-LINK   = -lgetch
+LINK   = -lti
 LPATH  = /usr/local/lib
 INCPATH = /usr/local/include
 
