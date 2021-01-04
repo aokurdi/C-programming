@@ -23,14 +23,6 @@
 #define __GETCH_H__
 #include <stdbool.h>
 
-#ifndef DEL
-#define DEL 0x7f
-#endif
-
-#ifndef ESC
-#define ESC 0x1b
-#endif
-
 /* The order is important */
 static char *KNAMES[] = {
 	"<F1>",

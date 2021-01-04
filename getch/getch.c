@@ -108,7 +108,7 @@ restore_org_attrs ( void )
 handle_SIGTERM ( int sig )
 {
 	restore_org_attrs();
-	fprintf( stderr, "\e[2J\e[1H\n\n" );  /* Clear Screen */
+	printf( "\e[2J\e[1H\n\n" );  /* Clear Screen */
 	fprintf( stderr, "\tFatal: Recived SIGTERM... %d\n", sig );
 	exit( 128 + sig );
 }		/* -----  end of function handle_SIGKILL  ----- */
