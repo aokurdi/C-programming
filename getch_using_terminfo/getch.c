@@ -21,68 +21,27 @@
 
 #include    <ctype.h>
 #include	<termios.h>
-#include	<stdbool.h>
 #include	<signal.h>
 #include	<string.h>
 #include	<stdlib.h>
 #include	<unistd.h>
 #include	<stdio.h>
 
-
-#include	"getch.h"
+#include	"ti.h"
 
 /*####  Defines #################################################################### */
 
-#define KSTR	15
-#define TBLSIZE 37
+#define KSTR	16
 
 
 /*####  Global  #################################################################### */
 
-typedef struct key key;
 static struct termios orgTerm;
-static key *KEYSTBL[TBLSIZE];
-
-struct key {
-	char kstr[KSTR];
-	char kname[KSTR];
-	int  kcode;
-	struct key *next;
-};
-
-/* The order is important */
-static char *KEYS[] = {
-	"\eOP",     /* F1 */
-	"\eOQ",
-	"\eOR",
-	"\eOS",
-	"\e[15~",
-	"\e[17~",
-	"\e[18~",
-	"\e[19~",
-	"\e[20~",
-	"\e[21~",
-	"\e[23~",
-	"\e[24~",   /* F12   */
-	"\e[2~",    /* INSRT */
-	"\e[3~",    /* DEL   */
-	"\e[5~",    /* PgUp  */
-	"\e[6~",    /* PgDn  */
-	"\e[A",     /* UP    */
-	"\e[B",     /* DN    */
-	"\e[C",     /* FWD   */
-	"\e[D",     /* BWD   */
-	"\e[F",     /* END   */
-	"\e[H",     /* HOME  */
-};
 
 
 /*####  Private routines  ########################################################## */
 
-static unsigned int search_keys_tbl ( const char * );
-static unsigned int get_hash_value ( const char * );
 int  get_key_code ( const char * );
-bool insert_key_in_tbl ( key * );
 void handle_SIGTERM ( int );
 int  init_term ( void );
 int  read_key ( );
@@ -96,6 +55,9 @@ int  read_key ( );
 restore_org_attrs ( void )
 {
 	tcsetattr( STDIN_FILENO, TCSAFLUSH, &orgTerm );
+
+	/* Leave keyboard transmit modem; ncurses = "rmkx" */
+	printf( "\e[?1l\e>" );
 }
 
 /*
@@ -108,7 +70,7 @@ restore_org_attrs ( void )
 handle_SIGTERM ( int sig )
 {
 	restore_org_attrs();
-	fprintf( stderr, "\e[2J\e[1H\n\n" );  /* Clear Screen */
+	printf( "\e[2J\e[1H\n\n" );  /* Clear Screen */
 	fprintf( stderr, "\tFatal: Recived SIGTERM... %d\n", sig );
 	exit( 128 + sig );
 }		/* -----  end of function handle_SIGKILL  ----- */
@@ -143,7 +105,14 @@ getCh ( )
 	/* In case we recieve kill signal we want to restore term */
 	signal( SIGTERM, handle_SIGTERM );
 
+	/* Make sure keyboard transmit mode is enabled
+	 * Thi is important to map some keys correctly like arrow
+	 * down key and end key; ncurses "smkx" mode */
+	printf( "\e[?1h\e=" );
+
+	/* Flush out any buffered output */
 	fflush( stdout );
+
 	init_term( );
 	int keyCode = read_key( );
 
@@ -170,7 +139,8 @@ init_term ( void )
 
 	/* IXON: disable Ctl-s Ctal-q
 	 * ICRNL: disable \r\n combo so Ctl-m returns 13 */
-	rawTerm.c_iflag &= ~( IXON | ICRNL );  /* Input flags */
+	rawTerm.c_iflag &= ~( IXON | ICRNL | IGNBRK | PARMRK );  /* Input flags */
+	rawTerm.c_iflag &= ~( BRKINT | INPCK | ISTRIP | INLCR);
 
 	/* ISIG: disable Ctl-c Ctl-z, ICANON: disable stdin buffering
 	 * IEXTEN: disable Ctl-v, ECHO: disable echo */
@@ -180,10 +150,11 @@ init_term ( void )
 	rawTerm.c_oflag &= ~( OPOST );  /* Output flags */
 
 	/* Force char size to be 8 bits */
-	rawTerm.c_cflag |= ( CS8 );
+	rawTerm.c_cflag &= ~( CSIZE | PARENB );      /* Control mode */
+	rawTerm.c_cflag |= ( CS8 );      /* Control mode */
 
 	rawTerm.c_cc[VMIN]  = 1; /* Read at least 1 char */
-	rawTerm.c_cc[VTIME] = 0; /* Don't wait */
+	rawTerm.c_cc[VTIME] = 0; /* No timer */
 
 	tcsetattr( STDIN_FILENO, TCSAFLUSH, &rawTerm );
     return 0;
@@ -223,9 +194,7 @@ get_key_code ( const char *kstr )
 {
 	int code;
 
-	create_keys_tbl( );
-	code = search_keys_tbl( kstr );
-	free_keys_tbl( );
+	code = get_code_from_ti( kstr );
 	return code;
 }		/* -----  end of function get_key_code  ----- */
 
@@ -263,141 +232,3 @@ getChNoEcho ( )
 
 	return keyCode;
 }
-
-/* ###  The following functions are used internally to build a table to handle
- * FUNCTION keys
- */
-/*
- * ===  Creates keys table  ============================================================
- *         Name:  create_keys_tbl
- *  Description:
- * =====================================================================================
- */
-	void
-create_keys_tbl ( )
-{
-	key *tmp = NULL;
-	register int i;
-
-	/* Initialize the keys table */
-	for( i = 0; i < TBLSIZE; i++ ) KEYSTBL[i] = NULL;
-
-	/* Allocate mem for a key and generate code */
-	for( i = 0; i < (sizeof (KEYS)/sizeof (KEYS[0])); i++ ) {
-		tmp = malloc( sizeof (key) );
-		strcpy( tmp->kstr, KEYS[i] );    /* Key string */
-		strcpy( tmp->kname, KNAMES[i] ); /* Key string */
-		tmp->kcode = i + 256;           /* Generate code for key */
-		insert_key_in_tbl( tmp );        /* Insert key in keys table */
-	}
-}		/* -----  end of function create_keys_tbl  ----- */
-
-
-/*
- * ===  Prints the keys Table  =========================================================
- *         Name:  print_keys_tbl
- *  Description: I am using this function to tweek the hash table for the keys
- * =====================================================================================
- */
-	void
-print_keys_tbl ( )
-{
-	register int i;
-	for( i = 0; i < TBLSIZE; ++i ) {
-
-		if( KEYSTBL[i] != NULL ) {
-			printf( "\t%d", i );
-			key *tmp = KEYSTBL[i];
-
-			while( tmp != NULL ) {
-				printf( "\t{key: %s\tkey string: ^[%s", tmp->kname, &tmp->kstr[1] );
-				printf( "\tcode: %d}", tmp->kcode );
-				tmp = tmp->next;
-			}
-			printf( "\n" );
-		}
-	}
-}		/* -----  end of function print_keys_tbl  ----- */
-
-
-/*
- * ===  Inerer keys into the hash table  ===============================================
- *         Name:  insert_key_in_tbl
- *  Description:
- * =====================================================================================
- */
-	bool
-insert_key_in_tbl (key *keyptr)
-{
-	int index;
-	if( keyptr == NULL )
-		return false;
-
-	index = get_hash_value( keyptr->kstr );
-	keyptr->next = KEYSTBL[index];
-	KEYSTBL[index] = keyptr;
-	return true;
-}		/* -----  end of function insert_key_in_tbl  ----- */
-
-
-/*
- * ===  Get a hash index dependig on key string  =======================================
- *         Name:  get_hash_value
- *  Description:
- * =====================================================================================
- */
-	static unsigned int
-get_hash_value ( const char *keystr )
-{
-	long int hashVal = 0;
-
-	/* Creating hash index */
-	while( *keystr != '\0' && *keystr != 0x7E ) {
-		hashVal = ((hashVal << 8) | *keystr) + 33;
-		keystr++;
-	}
-
-	/* Treming index to table size */
-	return hashVal % TBLSIZE;
-}		/* -----  end of function get_hash_value  ----- */
-
-
-/*
- * ===  Search the tabel using hash index  =============================================
- *         Name:  search_keys_tbl
- *  Description:
- * =====================================================================================
- */
-	static unsigned int
-search_keys_tbl( const char *keystr )
-{
-	key *tmp;
-	int index = get_hash_value( keystr );
-	tmp = KEYSTBL[index];
-
-	while( tmp != NULL && strcmp (tmp->kstr, keystr) !=0 )
-		tmp = tmp->next;
-
-	return( tmp ? tmp->kcode : 27 );
-}		/* -----  end of function search_keys_tbl  ----- */
-
-
-/*
- * ===  free the memory allocated for the keys table  ==================================
- *         Name:  free_keys_tbl
- *  Description:
- * =====================================================================================
- */
-	void
-free_keys_tbl ( )
-{
-	key *tmp;
-	for( int i = 0; i < TBLSIZE; ++i ) {
-		while( KEYSTBL[i] != NULL ) {
-			tmp = KEYSTBL[i];
-			KEYSTBL[i] = KEYSTBL[i]->next;
-			free( tmp );
-		}
-	}
-	return ;
-}		/* -----  end of function free_keys_tbl  ----- */

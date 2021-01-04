@@ -31,6 +31,32 @@
 #define ESC 0x1b
 #endif
 
+/* The order is important */
+static char *KNAMES[] = {
+	"<F1>",
+	"<F2>",
+	"<F3>",
+	"<F4>",
+	"<F5>",
+	"<F6>",
+	"<F7>",
+	"<F8>",
+	"<F9>",
+	"<F10>",
+	"<F11>",
+	"<F12>",
+	"<INSERT>", /* INSRT */
+	"<DEL>",    /* DEL   */
+	"<PgUP>",   /* PgUp  */
+	"<PgDN>",   /* PgDn  */
+	"<UP>",     /* UP    */
+	"<DN>",     /* DN    */
+	"<FWD>",    /* FWD   */
+	"<BWD>",    /* BWD   */
+	"<END>",    /* END   */
+	"<HOME>",   /* HOME  */
+};
+
 /*
  * ===  FUNCTION  ======================================================================
  *         Name:  getCh

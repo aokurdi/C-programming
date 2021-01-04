@@ -2,10 +2,21 @@
 #include    <ctype.h>
 #include    <stdlib.h>
 #include    "getch.h"
+#include    "ti.h"
 
 /* Mapping CTRL-KEY */
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define CLEAR_SCR "\e[2J\e[1H"
+
+
+#include	<stdlib.h>
+
+/*
+ * ===  FUNCTION  ======================================================================
+ *         Name:  main
+ *  Description: Test getch lib
+ * =====================================================================================
+ */
     int
 main (int argc, char **argv)
 {
@@ -13,17 +24,12 @@ main (int argc, char **argv)
 
     /* Test key code returns */
     printf( CLEAR_SCR );   /* clear screan */
-    printf( "\n\t\tCTRL-Q: go next test, CTRL-P: print keys table\n" );
+    printf( "\n\t\tCTRL-Q: go next test\n" );
     printf( "\t\tHit a key to get key code: " );
 
     while( (ch = getCh( )) != CTRL_KEY('q') ) {
-        if( ch == CTRL_KEY('p') ) {
-            printf( "\n\n" );
-            create_keys_tbl ( );
-            print_keys_tbl  ( );
-            free_keys_tbl   ( );
-        } else if( ch > 255 ) {
-            printf( "\n\t\tKey is: %-10s\tkey code is: %i\n", KNAMES[ch - 256], ch );
+        if( ch > 255 ) {
+            printf( "\n\t\t%-25s\t%i\n", get_key_name ( ch ), ch );
         } else {
             printf( "\n\t\tKey is: '%c'\tkey code is: %i\n",
                     ( isprint(ch) ? ch : ' '), ch );
@@ -32,7 +38,7 @@ main (int argc, char **argv)
         printf( "\n\t\tHit a key to continue...." );
         getCh( );
         printf( CLEAR_SCR );   /* clear screan */
-        printf( "\n\t\tCTRL-Q: go next test, CTRL-P: print keys table\n" );
+        printf( "\n\t\tCTRL-Q: go next test\n" );
         printf( "\t\tHit a key to get key code: " );
 
     }
@@ -79,4 +85,4 @@ main (int argc, char **argv)
     if (buffer) free (buffer);
 
     return EXIT_SUCCESS;
-}
+}				/* ----------  end of function main  ---------- */
