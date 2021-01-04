@@ -25,7 +25,7 @@
 
 #include    "ti.h"
 
-/* Key names if user which to get the name of key pressed
+/* Key names if user wishes to get the name of key pressed
  * the order and abriviations are from ncuses source code
  * order is important, DON'T CHANGE */
 static const char *KeyName[] = {
@@ -90,7 +90,7 @@ static const char *KeyName[] = {
  *  @Return
  *  int: code > 255 or -1 if key is not in terminfo db
  *
- *  NOTE: documintatin about terminf is scatered on internet, so i try to simpliefy it
+ *  NOTE: documintatin about terminfo is scatered on internet, so i try to simpliefy it
  *      for begainers "like me", i will heavly document what i am doing in code, but
  *      i will try to explain all in the README file; if you need help drop me a line.
  *
@@ -111,15 +111,18 @@ get_code_from_ti( const char *keyStr )
 
     dbSize = get_db_size( tinfoDB );
 
+    /* Allocate a buffer and read the db file to mem */
     buffer = malloc( dbSize + 1 );
     if(dbSize != fread( buffer, sizeof (char), dbSize, tinfoDB) ) {
         free( buffer );
-        fprintf( stderr, "Error while reading terminfo db\n" );
+        fprintf( stderr, "Fatal!: can't alloc enough mem for terminfo db\n" );
         return EXIT_FAILURE;
     }
 
+    /* Close db file */
     fclose( tinfoDB );
 
+    /* Terminfo header is 12 bytes, each 2bytes represnt a field length */
     read_terminfo_header( buffer, header );
     pos    = buffer;
     magic  = header[0];
@@ -127,27 +130,34 @@ get_code_from_ti( const char *keyStr )
     boolLen = header[2];
     numLen  = header[3];
     strsLen = header[4];
+    /* strings capabilities table size should be header[5] but i don't need
+     * it in this example
+     */
 
+    /* Magic number for 16bits db is 0432, and 1036 for 32bit db */
     if( magic != MAGIC16 && magic != MAGIC32 ) {
         fprintf( stderr, "Unknow terminfo format! %o\n", magic );
         exit( -1 );
     }
 
+    /* Depending on db bits we decide the int size so we get correct offset */
     intSize = (magic == 01036 ? 4 : 2 );
 
-    offset = 12 + nameLen + boolLen + numLen * intSize;
+    offset = 12 + nameLen + boolLen + (numLen * intSize);
 
     /* Apply padding if needed */
     if( (nameLen + boolLen) % 2 )
         offset++;
 
-    pos += offset;  /* At start of strs */
-    startOfTbl = pos + (strsLen * 2);
+    pos += offset;  /* At start of strings */
+    startOfTbl = pos + (strsLen * 2);  /* At start of strings table */
 
+    /* Loop through the strings table and find matching string */
     for( int i = 0; i < strsLen ; ++i ) {
         offset = get_str_cap(pos);
         pos += 2;
 
+        /* If string cap is not available, its offset is -1 */
         if( offset != -1 ) {
             if( strcmp( keyStr, &startOfTbl[offset] ) == 0) {
                 free( buffer );
@@ -175,12 +185,16 @@ get_code_from_ti( const char *keyStr )
  *          6th 2bytes: Strings "escape sequence" table size; after that you ll have
  *          the second header for extended caps which is also 12 bytes but out of
  *          scope of this example
+ *          to get the integer value of the field we multiply the second char
+ *          by 256u "force unsigned" and add the value of first char
  * =====================================================================================
  */
     void
 read_terminfo_header ( const char *buffer, uint16_t *header )
 {
-    size_t i, j = 0;
+    int i, j = 0;
+
+    /* Cast to unsigned char or we will get a negative WRONG value */
     const unsigned char *temp = (const unsigned char *) buffer;
 
     for( i = 0; i < 5; i++, j += 2 )
@@ -205,7 +219,11 @@ get_str_cap( const char *pos )
      * second byte = most seg bit; so to convert those 2 chars into a unsigned 16 bit
      * int we multiply the second byte by 256 and add the first byte */
     ret = temp[0] + temp[1] * 256u;
+
+    /* Return -1 if the value is greater than the max positive value of a 16 bit int
+     * -1 means the capability is not available */
     return ret <= MAX_S16 ? ret : -1;
+
 }		/* -----  end of function get_str_cap  ----- */
 
 
@@ -225,8 +243,9 @@ open_terminfo_file( )
     term = NULL;
     term = getenv( "TERM" );
     if( !term )
-        term = "linux";
+        term = "linux";  /* Drop to a linux term if TERM variable is not set */
 
+    /* Search those paths for terminfo db */
     char *path[] = {
                     "/lib/terminfo/",
                     "/etc/terminfo/",
@@ -240,6 +259,7 @@ open_terminfo_file( )
         }
     }
 
+    /* If terminfo db is not in those pathes, search in user home dir */
     home = getenv( "HOME" );
     snprintf( dbPath, 1024, "%s/.terminfo/%c/%s", home, term[0], term);
     if( (fp = fopen( dbPath, "rb" )) )
@@ -252,7 +272,7 @@ open_terminfo_file( )
 /*
  * ===  FUNCTION  ======================================================================
  *         Name:  get_db_size
- *  Description:
+ *  Description: returns the size of the db
  * =====================================================================================
  */
     size_t
