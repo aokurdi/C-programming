@@ -34,7 +34,7 @@
 /*####  Defines #################################################################### */
 
 #define KSTR	15
-#define TBLSIZE 37
+#define TBLSIZE 33
 
 
 /*####  Global  #################################################################### */
@@ -80,7 +80,7 @@ static char *KEYS[] = {
 /*####  Private routines  ########################################################## */
 
 static unsigned int search_keys_tbl ( const char * );
-static unsigned int get_hash_value ( const char * );
+static size_t get_hash_value ( const char * );
 int  get_key_code ( const char * );
 bool insert_key_in_tbl ( key * );
 void handle_SIGTERM ( int );
@@ -97,8 +97,9 @@ restore_org_attrs ( void )
 {
 	tcsetattr( STDIN_FILENO, TCSAFLUSH, &orgTerm );
 
-	/* Leave keyboard transmit mode */
-	printf( "\e[?1l\e>" );
+	/* Leave keypad transmit mode */
+	if( !write( STDOUT_FILENO, "\x1b[?1l\x1b>", 8 ) )
+		perror( "write" );
 }
 
 /*
@@ -111,8 +112,12 @@ restore_org_attrs ( void )
 handle_SIGTERM ( int sig )
 {
 	restore_org_attrs();
-	printf( "\e[2J\e[1H\n\n" );  /* Clear Screen */
-	fprintf( stderr, "\tFatal: Recived SIGTERM... %d\n", sig );
+
+	/* Leave keypad transmit mode and Clear Screen */
+	if( !write( STDOUT_FILENO, "\x1b[?1l\x1b>\x1b[2J\x1b[4;16H", 19 ) )
+		perror( "write" );
+
+	fprintf( stderr, "Fatal: Recived SIGTERM, Exit code: %d\n", sig );
 	exit( 128 + sig );
 }		/* -----  end of function handle_SIGKILL  ----- */
 
@@ -146,10 +151,11 @@ getCh ( )
 	/* In case we recieve kill signal we want to restore term */
 	signal( SIGTERM, handle_SIGTERM );
 
-	/* Make sure keyboard transmit mode is enabled
+	/* Make sure keypad transmit mode is enabled
 	 * Thi is important to map some keys correctly like arrow
 	 * down key and end key; ncurses "smkx" mode */
-	printf( "\e[?1h\e=" );
+	if( !write( STDOUT_FILENO, "\x1b[?1h\x1b=", 8 ) )
+		perror( "write" );
 
 	fflush( stdout );
 	init_term( );
@@ -337,7 +343,7 @@ print_keys_tbl ( )
 	bool
 insert_key_in_tbl (key *keyptr)
 {
-	int index;
+	size_t index;
 	if( keyptr == NULL )
 		return false;
 
@@ -354,14 +360,14 @@ insert_key_in_tbl (key *keyptr)
  *  Description:
  * =====================================================================================
  */
-	static unsigned int
+	static size_t
 get_hash_value ( const char *keystr )
 {
-	long int hashVal = 0;
+	size_t hashVal = 0, magic = 31;
 
 	/* Creating hash index */
-	while( *keystr != '\0' && *keystr != 0x7E ) {
-		hashVal = ((hashVal << 8) | *keystr) + 33;
+	while( *keystr ) {
+		hashVal = magic * hashVal + *keystr;
 		keystr++;
 	}
 
@@ -380,7 +386,7 @@ get_hash_value ( const char *keystr )
 search_keys_tbl( const char *keystr )
 {
 	key *tmp;
-	int index = get_hash_value( keystr );
+	size_t index = get_hash_value( keystr );
 	tmp = KEYSTBL[index];
 
 	while( tmp != NULL && strcmp (tmp->kstr, keystr) !=0 )
