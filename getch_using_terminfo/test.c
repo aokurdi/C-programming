@@ -8,7 +8,6 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define CLEAR_SCR "\e[2J\e[1H"
 
-
 #include	<stdlib.h>
 
 /*
@@ -29,10 +28,10 @@ main (int argc, char **argv)
 
     while( (ch = getCh( )) != CTRL_KEY('q') ) {
         if( ch > 255 ) {
-            printf( "\n\t\t%-25s\t%i\n", get_key_name ( ch ), ch );
+            printf( "\n\t\tKey name: <%s>%25s%i\n", get_key_name(ch), "Key code: ", ch );
         } else {
-            printf( "\n\t\tKey is: '%c'\tkey code is: %i\n",
-                    ( isprint(ch) ? ch : ' '), ch );
+            printf( "\n\t\tKey name: <%c>%25s%i\n",
+                    ( isprint(ch) ? ch : ' ' ), "Key code: ", ch );
         }
 
         printf( "\n\t\tHit a key to continue...." );
