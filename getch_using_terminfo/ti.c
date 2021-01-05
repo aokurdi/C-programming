@@ -108,7 +108,6 @@ get_code_from_ti( const char *keyStr )
     uint16_t numLen, strsLen;
 
     tinfoDB = open_terminfo_file( );
-
     dbSize = get_db_size( tinfoDB );
 
     /* Allocate a buffer and read the db file to mem */
@@ -297,5 +296,5 @@ get_db_size( FILE *db )
     const char *
 get_key_name( int kcode )
 {
-    return KeyName[kcode-256];
+    return ( (kcode > 255 && kcode < 415) ? KeyName[kcode-256] : NULL );
 }		/* -----  end of function get_key_name  ----- */
