@@ -25,7 +25,7 @@ main (int argc, char **argv)
         } else if( ch > 255 ) {
             printf( "\n\t\tKey is: %-10s\tkey code is: %i\n", KNAMES[ch - 256], ch );
         } else {
-            printf( "\n\t\tKey is: '%c'\tkey code is: %i\n",
+            printf( "\n\t\tKey is: <%c>\tkey code is: %i\n",
                     ( isprint(ch) ? ch : ' '), ch );
         }
 

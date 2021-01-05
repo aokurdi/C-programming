@@ -57,7 +57,8 @@ restore_org_attrs ( void )
 	tcsetattr( STDIN_FILENO, TCSAFLUSH, &orgTerm );
 
 	/* Leave keyboard transmit mode; ncurses = "rmkx" */
-	printf( "\e[?1l\e>" );
+	if( !write( STDOUT_FILENO, "\x1b[?1l\x1b>", 7 ) )
+		perror( "write" );
 }
 
 /*
@@ -108,7 +109,8 @@ getCh ( )
 	/* Make sure keyboard transmit mode is enabled
 	 * Thi is important to map some keys correctly like arrow
 	 * down key and end key; ncurses "smkx" mode */
-	printf( "\e[?1h\e=" );
+	if( !write( STDOUT_FILENO, "\x1b[?1h\x1b=", 7 ) )
+		perror( "write" );
 
 	/* Flush out any buffered output */
 	fflush( stdout );
