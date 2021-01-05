@@ -68,12 +68,12 @@ static char *KEYS[] = {
 	"\e[3~",    /* DEL   */
 	"\e[5~",    /* PgUp  */
 	"\e[6~",    /* PgDn  */
-	"\e[A",     /* UP    */
-	"\e[B",     /* DN    */
-	"\e[C",     /* FWD   */
-	"\e[D",     /* BWD   */
-	"\e[F",     /* END   */
-	"\e[H",     /* HOME  */
+	"\eOA",     /* UP    */
+	"\eOB",     /* DN    */
+	"\eOC",     /* FWD   */
+	"\eOD",     /* BWD   */
+	"\eOF",     /* END   */
+	"\eOH",     /* HOME  */
 };
 
 
@@ -96,6 +96,9 @@ int  read_key ( );
 restore_org_attrs ( void )
 {
 	tcsetattr( STDIN_FILENO, TCSAFLUSH, &orgTerm );
+
+	/* Leave keyboard transmit mode */
+	printf( "\e[?1l\e>" );
 }
 
 /*
@@ -142,6 +145,11 @@ getCh ( )
 
 	/* In case we recieve kill signal we want to restore term */
 	signal( SIGTERM, handle_SIGTERM );
+
+	/* Make sure keyboard transmit mode is enabled
+	 * Thi is important to map some keys correctly like arrow
+	 * down key and end key; ncurses "smkx" mode */
+	printf( "\e[?1h\e=" );
 
 	fflush( stdout );
 	init_term( );

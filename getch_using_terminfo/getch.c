@@ -56,7 +56,7 @@ restore_org_attrs ( void )
 {
 	tcsetattr( STDIN_FILENO, TCSAFLUSH, &orgTerm );
 
-	/* Leave keyboard transmit modem; ncurses = "rmkx" */
+	/* Leave keyboard transmit mode; ncurses = "rmkx" */
 	printf( "\e[?1l\e>" );
 }
 
