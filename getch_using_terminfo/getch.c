@@ -56,8 +56,8 @@ restore_org_attrs ( void )
 {
 	tcsetattr( STDIN_FILENO, TCSAFLUSH, &orgTerm );
 
-	/* Leave keyboard transmit mode; ncurses = "rmkx" */
-	if( !write( STDOUT_FILENO, "\x1b[?1l\x1b>", 7 ) )
+	/* Leave keybad transmit mode; ncurses = "rmkx" */
+	if( !write( STDOUT_FILENO, "\x1b[?1l\x1b>", 8 ) )
 		perror( "write" );
 }
 
@@ -71,8 +71,12 @@ restore_org_attrs ( void )
 handle_SIGTERM ( int sig )
 {
 	restore_org_attrs();
-	printf( "\e[2J\e[1H\n\n" );  /* Clear Screen */
-	fprintf( stderr, "\tFatal: Recived SIGTERM... %d\n", sig );
+
+	/* Leave keypad transmit mode and Clear Screen */
+	if( !write(STDOUT_FILENO, "\x1b[?1l\x1b>\x1b[2J\x1b[4;16H", 19) )
+		perror( "write" );
+
+	fprintf( stderr, "Fatal: Recived SIGTERM, Exit code: %d\n", sig );
 	exit( 128 + sig );
 }		/* -----  end of function handle_SIGKILL  ----- */
 
@@ -109,7 +113,7 @@ getCh ( )
 	/* Make sure keyboard transmit mode is enabled
 	 * Thi is important to map some keys correctly like arrow
 	 * down key and end key; ncurses "smkx" mode */
-	if( !write( STDOUT_FILENO, "\x1b[?1h\x1b=", 7 ) )
+	if( !write( STDOUT_FILENO, "\x1b[?1h\x1b=", 8 ) )
 		perror( "write" );
 
 	/* Flush out any buffered output */
