@@ -296,5 +296,5 @@ get_db_size( FILE *db )
     const char *
 get_key_name( int kcode )
 {
-    return ( (kcode > 255 && kcode < 669) ? KeyName[kcode-256] : NULL );
+    return( (kcode > 255 && kcode < 669) ? KeyName[kcode - code_begain] : NULL );
 }		/* -----  end of function get_key_name  ----- */
