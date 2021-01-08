@@ -63,7 +63,7 @@ main (int argc, char **argv)
 
     do {
         ch = getChNoEcho( );
-        if( ch != -1 && ch != 127 ) {
+        if( ch != -1 && !iscntrl(ch) ) {
             buffer[size] = ch;
             size++;
             buffer = realloc( buffer, (sizeof (char) * (size + 1)) );
