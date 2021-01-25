@@ -1,7 +1,6 @@
 #include    <stdio.h>
 #include    <ctype.h>
 #include    <stdlib.h>
-#include    "getch.h"
 #include    "ti.h"
 
 /* Mapping CTRL-KEY */

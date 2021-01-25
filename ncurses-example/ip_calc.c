@@ -24,7 +24,6 @@
 #include <string.h>
 #include <arpa/inet.h>
 
-#include <getch.h>
 #include "ip_calc.h"
 
 /* #####   MACROS  -  LOCAL TO THIS SOURCE FILE   ################################### */
